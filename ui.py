@@ -31,13 +31,8 @@ class ApplicationDirectory:
         self.selected_item_id = None
 
     def create_header(self):
-        title_label = tk.Label(
-            self.root, 
-            text="CITY OF MERIDIAN  -  INTERNAL IT APPLICATION DIRECTORY", 
-            bg="#F0F3F8", 
-            fg="#111827", 
-            font=("GeistMono", 13, "bold")
-        )
+        title_label = tk.Label(self.root, text="CITY OF MERIDIAN  -  INTERNAL IT APPLICATION DIRECTORY", 
+        bg="#F0F3F8", fg="#111827", font=("GeistMono", 13, "bold"))
         title_label.pack(fill=tk.X, anchor="center", padx=25, pady=(20, 15))
 
     def create_toolbar(self):
