@@ -11,6 +11,9 @@ class ApplicationDirectory:
         self.root.geometry("1100x650")
         self.root.configure(bg="#F0F3F8")
 
+        # Track selected item index for edits/deletions
+        self.selected_item_id = None
+
         # --- Header Section ---
         self.create_header()
 
@@ -27,8 +30,6 @@ class ApplicationDirectory:
         # Load data on startup
         self.refresh_table()
 
-        # Track selected item index for edits/deletions
-        self.selected_item_id = None
 
     def create_header(self):
         title_label = tk.Label(self.root, text="CITY OF MERIDIAN  -  INTERNAL IT APPLICATION DIRECTORY", 
@@ -184,26 +185,6 @@ class ApplicationDirectory:
 
         # --- BIND ROW SELECTION EVENT ---
         self.tree.bind("<<TreeviewSelect>>", self.on_row_select)
-
-
-    def _create_field(self, parent, label_text, placeholder, row, col, padx_val=(0, 0)):
-        # 1. Label
-        tk.Label(parent, text=label_text, bg="#F0F3F8", font=("Geist Mono", 8, "bold")).grid(
-            row=row, column=col, sticky="w", pady=(0, 2)
-        )
-        
-        # 2. Entry Field
-        entry = tk.Entry(parent, font=("Geist Mono", 9), relief="solid", bd=1, fg="#9CA3AF", highlightthickness=0)
-        entry.insert(0, placeholder)
-        
-        # 3. Dynamic Focus Handlers using lambda
-        # Bind focus events cleanly
-        entry.bind("<FocusIn>", self.on_field_focus_in)
-        entry.bind("<FocusOut>", lambda e, p=placeholder: self.on_field_focus_out(e, p))
-        
-        # 4. Grid Placement (row + 1 because label is at 'row')
-        entry.grid(row=row+1, column=col, padx=padx_val, pady=(0, 10 if row == 1 else 15), sticky="ew", ipady=4)
-        return entry
 
     def on_field_focus_in(self, event):
         """Wipes the field clean if it is currently displaying placeholder text (gray color)."""
