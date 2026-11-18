@@ -8,7 +8,7 @@ class ApplicationDirectory:
         self.root = root
 
         self.root.title("CITY OF MERIDIAN - INTERNAL IT APPLICATION DIRECTORY")
-        self.root.geometry("1100x650")
+        self.root.state("zoomed")
         self.root.configure(bg="#F0F3F8")
 
         # Track selected item index for edits/deletions
@@ -24,16 +24,15 @@ class ApplicationDirectory:
         self.create_table()
 
         # ---- Input form Section ------
-
         self.create_form()
 
-        # Load data on startup
+        # ---- Load data on startup ------
         self.refresh_table()
 
 
     def create_header(self):
         title_label = tk.Label(self.root, text="CITY OF MERIDIAN  -  INTERNAL IT APPLICATION DIRECTORY", 
-        bg="#F0F3F8", fg="#111827", font=("GeistMono", 13, "bold"))
+        bg="#F0F3F8", fg="#111827", font=("Geist Mono", 13, "bold"))
         title_label.pack(fill=tk.X, anchor="center", padx=25, pady=(20, 15))
 
     def create_toolbar(self):
@@ -42,14 +41,14 @@ class ApplicationDirectory:
 
         # Search Field
         search_frame = tk.Frame(toolbar_frame, bg="#F0F3F8")
-        search_frame.pack(side=tk.TOP, anchor="w", pady=(0, 10))
+        search_frame.pack(anchor="w", pady=(0, 10))
 
         # Initialize StringVar for real-time search filtering
         self.search_var = tk.StringVar()
         self.search_var.trace_add("write", self.filter_table)
 
         self.search_entry = tk.Entry(search_frame, textvariable=self.search_var, font=("Geist Mono", 9), 
-        width=52, relief="solid", bd=1, fg="#9CA3AF")#highlightthickness=0
+        width=52, relief="solid", bd=1, fg="#9CA3AF")
         self.search_entry.pack(side=tk.LEFT, padx=(0, 15), ipady=4)
         self.search_entry.insert(0, "🔍 Search Directory...")
 
@@ -525,16 +524,17 @@ class ApplicationDirectory:
         self.save_button.config(text="Save")
 
     def filter_table(self, *args):
-        """Instantly filters rows using the master item list and updates the count."""
+        """Instantly filters rows, re-tags them for clean zebra striping, and updates the count."""
         if not hasattr(self, "tree") or not hasattr(self, "all_tree_items"):
             return
 
         query = self.search_var.get().lower().strip()
         is_empty = (not query or query == "🔍 search directory...")
 
-        visible_count = 0
         total_count = len(self.all_tree_items)
+        visible_items = []
 
+        # 1. Filter and reattach matching rows
         for item in self.all_tree_items:
             if not self.tree.exists(item):
                 continue
@@ -542,12 +542,18 @@ class ApplicationDirectory:
             values = self.tree.item(item, "values")
             
             if is_empty or any(query in str(cell).lower() for cell in values):
+                visible_items.append(item)
                 self.tree.reattach(item, "", tk.END)
-                visible_count += 1
             else:
                 self.tree.detach(item)
 
-        # Update the status label dynamically based on search results
+        # 2. Re-apply alternating tags based on the new visible order
+        for index, item in enumerate(visible_items):
+            tag = "evenrow" if index % 2 == 0 else "oddrow"
+            self.tree.item(item, tags=(tag,))
+
+        # 3. Update the status label dynamically based on search results
+        visible_count = len(visible_items)
         if is_empty:
             self.status_label.config(text=f"Showing {total_count} entries of {total_count}")
         else:
