@@ -1,24 +1,23 @@
 # CSV read, write, update, delete functions
-import csv
-import sys
 
-# Increase CSV field size limit to prevent overflow errors with large records
-csv.field_size_limit(sys.maxsize)
+import csv
 
 FILE_NAME = "applications.csv"
 
 def load_applications():
-    with open(FILE_NAME, "r") as file:
-        return list(csv.reader(file))
 
-def save_application(app_name, category, department, url):
-    with open(FILE_NAME, "a", newline="") as file:
-        writer = csv.writer(file)
-        writer.writerow([app_name, category, department, url])
+    #Loads all application records from the CSV file.
+
+    file = open(FILE_NAME, "r", encoding="utf-8")
+    data = list(csv.reader(file))
+    file.close()
+    return data
 
 def save_all_applications(apps):
-    """Overwrites the CSV file with the complete updated list of applications."""
-    with open(FILE_NAME, "w", newline="", encoding="utf-8") as file:
-        writer = csv.writer(file)
-        writer.writerows(apps)
 
+    #Overwrites the CSV file with the complete updated list of applications.
+
+    file = open(FILE_NAME, "w", newline="", encoding="utf-8")
+    writer = csv.writer(file)
+    writer.writerows(apps)
+    file.close()
