@@ -70,15 +70,15 @@ git push.  - push your code into github
 
 # Recommended Workflow Process
 
-1 Keep main as the clean, production-ready code.
+1 Keep the main branch as the clean, assignment-ready code.
 
-2 Delete old feature branches on GitHub after their Pull Requests are merged by clicking the delete icon.
+2 For each new feature or code modification, pull the main branch and create a single-purpose branch (e.g., git checkout -b build-input-form).
 
-3 Delete old feature branches in VS code by switching to main branch and then run: 
-git fetch -p (Clean up deleted remote branch references)
-git branch -d dreyz/assignment2 (Delete the old branch locally)
+3 Commit your code to GitHub and create a pull request.
 
-4 For each new feature, modification to code or step, pull main and create a single-purpose branch (e.g., git checkout -b build-input-form).
+4 Have someone else on the team test the changes before merging into the main branch.
+
+5 Make sure the code works and integrates cleanly with the existing code without issues before merging into main.
 
 
 #NOTE: if anything is unclear, gemini or chatgpt can clear up the questions.
