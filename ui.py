@@ -1,3 +1,4 @@
+import difflib
 import tkinter as tk
 from tkinter import ttk
 import data_manager
@@ -473,6 +474,125 @@ class ApplicationDirectory:
             entry.insert(0, val)
             entry.config(fg="#111827")  # Switch text color from placeholder gray to active dark text
 
+    def ask_custom_confirm(self, title, message):
+        """A compact custom Yes/No popup window."""
+        confirmed = [False]
+
+        dialog = tk.Toplevel(self.root)
+        dialog.overrideredirect(True)
+        dialog.title(title)
+        dialog.geometry("380x210")
+        dialog.resizable(False, False)
+        dialog.configure(bg="#FFFFFF")
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        dialog.update_idletasks()
+        x = self.root.winfo_x() + (self.root.winfo_width() // 2) - (340 // 2)
+        y = self.root.winfo_y() + (self.root.winfo_height() // 2) - (170 // 2)
+        dialog.geometry(f"+{x}+{y}")
+
+        tk.Label(
+            dialog, text=message, bg="#FFFFFF", fg="#111827",
+            font=("Geist Mono", 9), wraplength=300
+        ).pack(pady=(25, 15), expand=False)
+
+        btn_frame = tk.Frame(dialog, bg="#FFFFFF")
+        btn_frame.pack(pady=(0, 15), expand=False)
+
+        def set_choice(value):
+            confirmed[0] = value
+            dialog.destroy()
+
+        tk.Button(
+            btn_frame, text="No", bg="#E5E7EB", fg="#111827", font=("Geist Mono", 9),
+            command=lambda: set_choice(False), padx=18, pady=5
+        ).pack(side=tk.LEFT, padx=6)
+
+        ttk.Button(
+            btn_frame, text="Yes", style="Black.TButton",
+            command=lambda: set_choice(True)
+        ).pack(side=tk.LEFT, padx=6)
+
+        self.root.wait_window(dialog)
+        return confirmed[0]
+    
+
+    def _normalize_text(self, value):
+            return " ".join(value.strip().lower().split())
+
+    def _normalize_url(self, url):
+        return url.strip().lower().rstrip("/")
+
+    def _find_duplicate_issue(self, app_name, category, owner, url, apps, skip_index=None):
+        """Returns (match_type, message) if an exact or close match exists, else (None, None)."""
+        norm_name = self._normalize_text(app_name)
+        norm_url = self._normalize_url(url)
+        norm_category = self._normalize_text(category)
+
+        for idx in range(len(apps)):
+            if skip_index is not None and idx == skip_index:
+                continue
+
+            row = apps[idx]
+            if len(row) < 4:
+                continue
+
+            existing_name = self._normalize_text(row[0])
+            existing_cat = self._normalize_text(row[1])
+            existing_url = self._normalize_url(row[3])
+
+            # 1. Exact duplicate check (same URL)
+            if norm_url and norm_url == existing_url:
+                return (
+                    "exact",
+                    f"An application with this URL already exists:\n"
+                    f"• App Name: {row[0]}\n"
+                    f"• Category: {row[1]}\n"
+                    f"• URL: {row[3]}"
+                )
+
+            # 2. Exact App Name with a different URL
+            if norm_name and norm_name == existing_name:
+                return (
+                    "similar",
+                    f"An application named '{row[0]}' already exists with a different URL:\n"
+                    f"• Existing URL: {row[3]}\n"
+                    f"• New URL: {url}\n\n"
+                    f"Save anyway?"
+                )
+
+            # 3. Near-duplicate / typo check using difflib
+            name_ratio = difflib.SequenceMatcher(None, norm_name, existing_name).ratio()
+            cat_ratio = difflib.SequenceMatcher(None, norm_category, existing_cat).ratio()
+
+            if 0.85 <= name_ratio < 1.0:
+                return (
+                    "similar",
+                    f"Found a very similar existing App Name ({int(name_ratio * 100)}% match):\n"
+                    f"• Existing: {row[0]} ({row[1]})\n"
+                    f"• New Entry: {app_name} ({category})\n\n"
+                    f"Save anyway?"
+                )
+            if norm_category and norm_category == existing_cat:
+                return (
+                    "similar",
+                    f"Category '{row[1]}' already exists in the directory.\n"
+                    f"Save under '{category}' anyway?",
+                )
+            
+
+            if norm_category and existing_cat and 0.80 <= cat_ratio < 1.0:
+                return (
+                    "similar",
+                    f"Possible category typo/variation ({int(cat_ratio * 100)}% match):\n"
+                    f"• Existing Category: {row[1]}\n"
+                    f"• Entered Category: {category}\n\n"
+                    f"Save anyway?"
+                )
+
+        return None, None
+
     def save_record(self):
         app_name = self.app_name_entry.get().strip()
         category = self.category_entry.get().strip()
@@ -489,11 +609,23 @@ class ApplicationDirectory:
         url = validation.format_url(url)
 
         apps = data_manager.load_applications()
+        editing_index = getattr(self, "selected_item_id", None)
 
-        if getattr(self, "selected_item_id", None) is not None:
-            index = self.selected_item_id
-            if 0 <= index < len(apps):
-                apps[index] = [app_name, category, owner, url]
+        match_type, match_msg = self._find_duplicate_issue(
+            app_name, category, owner, url, apps, skip_index=editing_index
+        )
+
+        if match_type == "exact":
+            self.show_custom_message("Duplicate Record", match_msg)
+            return
+
+        if match_type == "similar":
+            if not self.ask_custom_confirm("Possible Duplicate / Typo", match_msg):
+                return
+
+        if editing_index is not None:
+            if 0 <= editing_index < len(apps):
+                apps[editing_index] = [app_name, category, owner, url]
             self.selected_item_id = None
             self.save_button.config(text="Save")
         else:
@@ -502,7 +634,7 @@ class ApplicationDirectory:
         data_manager.save_all_applications(apps)
         self.refresh_table()
         self.clear_form()
-        
+
         self.show_custom_message("Success", "Application record saved successfully.")
 
     def clear_form(self):
