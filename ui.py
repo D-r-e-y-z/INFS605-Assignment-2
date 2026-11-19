@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import ttk
 import data_manager
 import validation
+from tkinter import messagebox
 
 class ApplicationDirectory:
     def __init__(self, root):
@@ -312,49 +313,31 @@ class ApplicationDirectory:
         self.status_label.config(text=f"Showing {total_count} entries of {total_count}")
 
     def show_custom_message(self, title, message):
-        """A compact, beginner-friendly custom popup window."""
-        dialog = tk.Toplevel(self.root)
-        dialog.overrideredirect(True)
-        dialog.title(title)
-        dialog.geometry("320x160")
-        dialog.resizable(False, False)
-        dialog.configure(bg="#FFFFFF")
-        dialog.transient(self.root)
-        dialog.grab_set()
-
-        # Center the popup relative to the main application window
-        dialog.update_idletasks()
-        x = self.root.winfo_x() + (self.root.winfo_width() // 2) - (320 // 2)
-        y = self.root.winfo_y() + (self.root.winfo_height() // 2) - (160 // 2)
-        dialog.geometry(f"+{x}+{y}")
-
-        # Message Label
-        tk.Label(dialog, text=message, bg="#FFFFFF", fg="#111827", font=("Geist Mono", 9), wraplength=280).pack(pady=(30, 15), expand=False)
-
-        # OK Button to close (Single pack call!)
-        tk.Button(dialog, text="OK", bg="#E5E7EB", fg="#111827", font=("Geist Mono", 9), 
-        command=dialog.destroy, padx=20, pady=5).pack(pady=(0, 20), expand=False)
-
-        self.root.wait_window(dialog)
+        from tkinter import messagebox
+        messagebox.showinfo(title, message, parent=self.root)
 
 
     #-------------------- Delete selected record and remove details from CSV file ---------------------
+   
     def delete_record(self):
-        """Pre-populates a confirmation popup with selected record details and deletes it."""
-        # 1. Check if a row is actually selected in the table
+        """Deletes the selected application after confirmation."""
+
+        # 1. Check whether an application is selected
         selected = self.tree.selection()
         if not selected:
             return
 
-        # 2. Get the raw values from the selected row and clean up extra padding spaces using a standard loop
+        # 2. Get the selected application's information
         raw_row = self.tree.item(selected[0], "values")
         values = []
+
         for v in raw_row:
             values.append(v.strip())
 
-        # 3. Load all apps and find the exact index of the matching record using a clear loop
+        # 3. Find the matching application in the CSV data
         apps = data_manager.load_applications()
         app_index = None
+
         for index, app in enumerate(apps):
             if app == values:
                 app_index = index
@@ -363,73 +346,31 @@ class ApplicationDirectory:
         if app_index is None:
             return
 
-        target_app = apps[app_index]
+        # 4. Ask the user to confirm deletion
+        confirm = messagebox.askyesno(
+            "Confirm Deletion",
+            f"Are you sure you want to delete '{values[0]}'?",
+            parent=self.root
+        )
 
-        # 4. Create the confirmation popup window
-        dialog = tk.Toplevel(self.root)
-        dialog.overrideredirect(True)
-        dialog.title("Confirm Deletion")
-        dialog.geometry("380x220")
-        dialog.resizable(False, False)
-        dialog.configure(bg="#FFFFFF")
-        dialog.transient(self.root)
-        dialog.grab_set()
+        if not confirm:
+            return
 
-        # Center the popup window on the screen
-        dialog.update_idletasks()
-        x = self.root.winfo_x() + (self.root.winfo_width() // 2) - 190
-        y = self.root.winfo_y() + (self.root.winfo_height() // 2) - 110
-        dialog.geometry(f"+{x}+{y}")
+        # 5. Delete the application and save the changes
+        apps.pop(app_index)
+        data_manager.save_all_applications(apps)
 
-        # Warning text label
-        tk.Label(
-            dialog, 
-            text="Are you sure you want to delete this record?", 
-            bg="#FFFFFF", 
-            fg="#111827", 
-            font=("Geist Mono", 9, "bold")
-        ).pack(pady=(20, 10))
+        # 6. Refresh the table and reset the buttons
+        self.refresh_table()
+        self.delete_button.config(state=tk.DISABLED, cursor="")
+        self.edit_button.config(state=tk.DISABLED, cursor="")
 
-        # 5. Display the details of the app being deleted inside a styled box
-        details_frame = tk.Frame(dialog, bg="#F9FAFB", padx=10, pady=10, relief="solid", bd=1)
-        details_frame.pack(fill=tk.X, padx=20, pady=5)
+        # 7. Display a success notification
+        self.show_custom_message(
+            "Success",
+            "Application record deleted successfully."
+        )
 
-        labels = [("App", target_app[0]), ("Category", target_app[1]), ("Owner", target_app[2]), ("URL", target_app[3])]
-        for label_text, val in labels:
-            tk.Label(
-                details_frame, 
-                text=f"{label_text}: {val}", 
-                bg="#F9FAFB", 
-                fg="#111827", 
-                font=("Geist Mono", 8), 
-                anchor="w"
-            ).pack(fill=tk.X)
-
-        # 6. Action buttons frame (Delete vs Cancel)
-        btn_frame = tk.Frame(dialog, bg="#FFFFFF")
-        btn_frame.pack(pady=15)
-
-        def confirm_delete():
-            # Remove item from list, save back to CSV, refresh table, and lock buttons
-            apps.pop(app_index)
-            data_manager.save_all_applications(apps)
-            self.refresh_table()
-            self.delete_button.config(state=tk.DISABLED, cursor="")
-            self.edit_button.config(state=tk.DISABLED, cursor="")
-            dialog.destroy()
-            self.show_custom_message("Success", "Application record deleted successfully.")
-
-        tk.Button(
-            btn_frame, text="Delete", bg="#EF4444", fg="#111827", font=("Geist Mono", 9), 
-            command=confirm_delete, padx=15, pady=4, relief="flat", cursor="hand2"
-        ).pack(side=tk.LEFT, padx=5)
-        
-        tk.Button(
-            btn_frame, text="Cancel", bg="#E5E7EB", fg="#111827", font=("Geist Mono", 9), 
-            command=dialog.destroy, padx=15, pady=4, relief="flat", cursor="hand2"
-        ).pack(side=tk.LEFT, padx=5)
-
-        self.root.wait_window(dialog)
 
     def edit_record(self):
         """Loads the selected record's data into the form fields for editing."""
