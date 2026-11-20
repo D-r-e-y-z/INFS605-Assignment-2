@@ -315,13 +315,11 @@ class ApplicationDirectory:
     def show_custom_message(self, title, message):
         """A compact, beginner-friendly custom popup window."""
         dialog = tk.Toplevel(self.root)
-        dialog.overrideredirect(True)
         dialog.title(title)
         dialog.geometry("320x160")
         dialog.resizable(False, False)
         dialog.configure(bg="#FFFFFF")
         dialog.transient(self.root)
-        dialog.grab_set()
 
         # Center the popup relative to the main application window
         dialog.update_idletasks()
@@ -331,10 +329,17 @@ class ApplicationDirectory:
 
         # Message Label
         tk.Label(dialog, text=message, bg="#FFFFFF", fg="#111827", font=("Geist Mono", 9), wraplength=280).pack(pady=(30, 15), expand=False)
+        def close_dialog():
+            if dialog.winfo_exists():
+                try:
+                    dialog.grab_release()
+                except tk.TclError:
+                    pass
+                dialog.destroy()
 
         # OK Button to close (Single pack call!)
         tk.Button(dialog, text="OK", bg="#E5E7EB", fg="#111827", font=("Geist Mono", 9), 
-        command=dialog.destroy, padx=20, pady=5).pack(pady=(0, 20), expand=False)
+        command=close_dialog, padx=20, pady=5).pack(pady=(0, 20), expand=False)
 
         self.root.wait_window(dialog)
 
@@ -479,13 +484,12 @@ class ApplicationDirectory:
         confirmed = [False]
 
         dialog = tk.Toplevel(self.root)
-        dialog.overrideredirect(True)
         dialog.title(title)
         dialog.geometry("380x210")
         dialog.resizable(False, False)
         dialog.configure(bg="#FFFFFF")
         dialog.transient(self.root)
-        dialog.grab_set()
+       
 
         dialog.update_idletasks()
         x = self.root.winfo_x() + (self.root.winfo_width() // 2) - (340 // 2)
@@ -500,9 +504,17 @@ class ApplicationDirectory:
         btn_frame = tk.Frame(dialog, bg="#FFFFFF")
         btn_frame.pack(pady=(0, 15), expand=False)
 
+        def close_dialog():
+            if dialog.winfo_exists():
+                try:
+                    dialog.grab_release()
+                except tk.TclError:
+                    pass
+                dialog.destroy()
+
         def set_choice(value):
             confirmed[0] = value
-            dialog.destroy()
+            close_dialog()
 
         tk.Button(
             btn_frame, text="No", bg="#E5E7EB", fg="#111827", font=("Geist Mono", 9),
@@ -635,7 +647,10 @@ class ApplicationDirectory:
         self.refresh_table()
         self.clear_form()
 
-        self.show_custom_message("Success", "Application record saved successfully.")
+        self.root.after(
+            50,
+            lambda: self.show_custom_message("Success", "Application record saved successfully."),
+        )
 
     def clear_form(self):
         """Resets all form fields back to their default placeholder states and resets selection state."""
