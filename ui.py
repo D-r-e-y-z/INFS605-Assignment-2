@@ -27,6 +27,8 @@ class ApplicationDirectory:
         self.create_form()
 
         # ---- Load data on startup ------
+        self.sort_column = None    # which column is sorted (0-3)
+        self.sort_reverse = False  # False = A to Z, True = Z to A
         self.refresh_table()
 
 
@@ -144,6 +146,10 @@ class ApplicationDirectory:
 
         columns = ("app_name", "category", "business_owner", "app_url")
         self.tree = ttk.Treeview(table_frame, columns=columns, show="headings", height=6)
+        self.tree.heading("app_name", text="APP NAME", anchor="w", command=lambda: self.sort_table(0))
+        self.tree.heading("category", text="CATEGORY", anchor="w", command=lambda: self.sort_table(1))
+        self.tree.heading("business_owner", text="BUSINESS OWNER", anchor="w", command=lambda: self.sort_table(2))
+        self.tree.heading("app_url", text="APP URL / LINK", anchor="w", command=lambda: self.sort_table(3))
 
         self.tree.heading("app_name", text="APP NAME", anchor="w")
         self.tree.heading("category", text="CATEGORY", anchor="w")
@@ -300,6 +306,9 @@ class ApplicationDirectory:
         
         # Load rows from applications.csv and save globally for filtering counts
         self.all_apps_data = data_manager.load_applications()
+
+        if self.sort_column is not None:
+            self.all_apps_data.sort(key=lambda app: app[self.sort_column].lower(), reverse=self.sort_reverse)
         
         for index, app in enumerate(self.all_apps_data):
             padded_app = [f"  {item}" for item in app]
@@ -522,7 +531,18 @@ class ApplicationDirectory:
             
         self.selected_item_id = None
         self.save_button.config(text="Save")
+        
+    def sort_table(self, column_index):
+        """Sorts by the clicked column. Clicking the same column again reverses the order."""
+        if self.sort_column == column_index:
+            self.sort_reverse = not self.sort_reverse
+        else:
+            self.sort_column = column_index
+            self.sort_reverse = False
 
+        self.refresh_table()
+        self.filter_table()
+    
     def filter_table(self, *args):
         """Instantly filters rows, re-tags them for clean zebra striping, and updates the count."""
         if not hasattr(self, "tree") or not hasattr(self, "all_tree_items"):
