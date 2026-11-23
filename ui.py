@@ -32,6 +32,19 @@ class ApplicationDirectory:
         self.sort_reverse = False  # False = A to Z, True = Z to A
         self.refresh_table()
 
+        # Allow Enter to trigger save except on search or buttons
+        self.root.bind("<Return>", self._on_return_key)
+        self.root.bind("<KP_Enter>", self._on_return_key)
+
+    def _on_return_key(self, event):
+        widget = event.widget
+        if widget is self.search_entry:
+            return
+        if isinstance(widget, (tk.Button, ttk.Button)):
+            return
+        self.save_record()
+        return "break"
+
 
     def create_header(self):
         title_label = tk.Label(self.root, text="CITY OF MERIDIAN  -  INTERNAL IT APPLICATION DIRECTORY", 
@@ -152,11 +165,6 @@ class ApplicationDirectory:
         self.tree.heading("business_owner", text="BUSINESS OWNER", anchor="w", command=lambda: self.sort_table(2))
         self.tree.heading("app_url", text="APP URL / LINK", anchor="w", command=lambda: self.sort_table(3))
 
-        self.tree.heading("app_name", text="APP NAME", anchor="w")
-        self.tree.heading("category", text="CATEGORY", anchor="w")
-        self.tree.heading("business_owner", text="BUSINESS OWNER", anchor="w")
-        self.tree.heading("app_url", text="APP URL / LINK", anchor="w")
-
        # Define exact column widths that fill the container width proportionally (~1000px total)
         self.tree.column("app_name", width=250, minwidth=200, anchor="w")
         self.tree.column("category", width=180, minwidth=140, anchor="w")
@@ -192,21 +200,6 @@ class ApplicationDirectory:
         # --- BIND ROW SELECTION EVENT ---
         self.tree.bind("<<TreeviewSelect>>", self.on_row_select)
 
-    def on_field_focus_in(self, event):
-        """Wipes the field clean if it is currently displaying placeholder text (gray color)."""
-        widget = event.widget
-        if widget.cget("fg").lower() == "#9CA3AF":
-            widget.delete(0, tk.END)
-            widget.config(fg="#111827")  # Switch to dark typing color
-
-    def on_field_focus_out(self, event, placeholder):
-        """Restores the placeholder if the user left the field completely empty."""
-        widget = event.widget
-        if not widget.get().strip():
-            widget.delete(0, tk.END)
-            widget.insert(0, placeholder)
-            widget.config(fg="#9CA3AF")
-
     def create_required_label(self, parent, text):
         #Helper to create a field label with a red asterisk.
         label_frame = tk.Frame(parent, bg="#F0F3F8")  # Matches form background
@@ -239,16 +232,27 @@ class ApplicationDirectory:
         field_container.grid(row=row, column=col, sticky="ew", padx=padx_val, pady=(0, 12))
         field_container.grid_columnconfigure(0, weight=1)
 
-        # Use the required label helper for the label portion
         self.create_required_label(field_container, label_text).pack(anchor="w", pady=(0, 4))
 
-        # Entry widget with placeholder behavior
         entry = tk.Entry(field_container, font=("Geist Mono", 9), relief="solid", bd=1, fg="#9CA3AF")
         entry.insert(0, placeholder)
-        entry.bind("<FocusIn>", lambda e: (entry.get() == placeholder and (entry.delete(0, tk.END), entry.config(fg="#111827"))))
-        entry.bind("<FocusOut>", lambda e: (not entry.get() and (entry.insert(0, placeholder), entry.config(fg="#9CA3AF"))))
+
+        def clear_placeholder(_e=None):
+            if entry.cget("fg").lower() == "#9ca3af" or entry.get() == placeholder:
+                entry.delete(0, tk.END)
+                entry.config(fg="#111827")
+
+        def restore_placeholder(_e=None):
+            if not entry.get().strip():
+                entry.delete(0, tk.END)
+                entry.insert(0, placeholder)
+                entry.config(fg="#9CA3AF")
+
+        entry.bind("<FocusIn>", clear_placeholder)
+        entry.bind("<Key>", clear_placeholder)
+        entry.bind("<FocusOut>", restore_placeholder)
         entry.pack(fill=tk.X, ipady=3)
-        
+
         return entry
 
     def create_form(self):
@@ -260,11 +264,6 @@ class ApplicationDirectory:
             focusthickness=3, focuscolor="none", padding=9, font=("Geist Mono", 9)
         )
         style.map("Black.TButton", background=[("active", "#1F2937")])
-
-        style.configure("White.TButton", background="#FFFFFF", foreground="#111827", borderwidth=1,
-            bordercolor="#111827", focusthickness=3, focuscolor="none", padding=6
-        )
-        style.map("White.TButton", background=[("active", "#F3F4F6")])
 
         form_frame = tk.Frame(self.root, bg="#F0F3F8", relief="solid", bd=1, padx=20, pady=15)
         form_frame.pack(fill=tk.X, padx=25, pady=(0, 20))
@@ -304,51 +303,40 @@ class ApplicationDirectory:
     def refresh_table(self):
         for row in self.tree.get_children():
             self.tree.delete(row)
-        
-        # Load rows from applications.csv and save globally for filtering counts
-        self.all_apps_data = data_manager.load_applications()
 
+        apps = data_manager.load_applications()
         if self.sort_column is not None:
-            self.all_apps_data.sort(key=lambda app: app[self.sort_column].lower(), reverse=self.sort_reverse)
-        
-        for index, app in enumerate(self.all_apps_data):
+            apps.sort(key=lambda app: app[self.sort_column].lower(), reverse=self.sort_reverse)
+
+        for index, app in enumerate(apps):
             padded_app = [f"  {item}" for item in app]
             tag = "evenrow" if index % 2 == 0 else "oddrow"
             self.tree.insert("", tk.END, values=padded_app, tags=(tag,))
-        
+
         self.all_tree_items = self.tree.get_children()
-        
-        total_count = len(self.all_apps_data)
+        total_count = len(apps)
         self.status_label.config(text=f"Showing {total_count} entries of {total_count}")
 
     def show_custom_message(self, title, message):
         """A compact, beginner-friendly custom popup window."""
         dialog = tk.Toplevel(self.root)
+        dialog.overrideredirect(True)
         dialog.title(title)
-        dialog.geometry("320x160")
         dialog.resizable(False, False)
-        dialog.configure(bg="#FFFFFF")
+        dialog.configure(bg="#FFFFFF", highlightthickness=1, highlightbackground="#D1D5DB")
         dialog.transient(self.root)
+        dialog.grab_set()
+        self._center_dialog(dialog, 380, 210)
 
-        # Center the popup relative to the main application window
-        dialog.update_idletasks()
-        x = self.root.winfo_x() + (self.root.winfo_width() // 2) - (320 // 2)
-        y = self.root.winfo_y() + (self.root.winfo_height() // 2) - (160 // 2)
-        dialog.geometry(f"+{x}+{y}")
+        tk.Label(
+            dialog, text=message, bg="#FFFFFF", fg="#111827",
+            font=("Geist Mono", 9), wraplength=280
+        ).pack(pady=(30, 15), expand=False)
 
-        # Message Label
-        tk.Label(dialog, text=message, bg="#FFFFFF", fg="#111827", font=("Geist Mono", 9), wraplength=280).pack(pady=(30, 15), expand=False)
-        def close_dialog():
-            if dialog.winfo_exists():
-                try:
-                    dialog.grab_release()
-                except tk.TclError:
-                    pass
-                dialog.destroy()
-
-        # OK Button to close (Single pack call!)
-        tk.Button(dialog, text="OK", bg="#E5E7EB", fg="#111827", font=("Geist Mono", 9), 
-        command=close_dialog, padx=20, pady=5).pack(pady=(0, 20), expand=False)
+        tk.Button(
+            dialog, text="OK", bg="#E5E7EB", fg="#111827", font=("Geist Mono", 9),
+            command=lambda: self._close_dialog(dialog), padx=20, pady=5
+        ).pack(pady=(0, 20), expand=False)
 
         self.root.wait_window(dialog)
 
@@ -356,18 +344,13 @@ class ApplicationDirectory:
     #-------------------- Delete selected record and remove details from CSV file ---------------------
     def delete_record(self):
         """Pre-populates a confirmation popup with selected record details and deletes it."""
-        # 1. Check if a row is actually selected in the table
         selected = self.tree.selection()
         if not selected:
             return
 
-        # 2. Get the raw values from the selected row and clean up extra padding spaces using a standard loop
         raw_row = self.tree.item(selected[0], "values")
-        values = []
-        for v in raw_row:
-            values.append(v.strip())
+        values = [v.strip() for v in raw_row]
 
-        # 3. Load all apps and find the exact index of the matching record using a clear loop
         apps = data_manager.load_applications()
         app_index = None
         for index, app in enumerate(apps):
@@ -380,68 +363,57 @@ class ApplicationDirectory:
 
         target_app = apps[app_index]
 
-        # 4. Create the confirmation popup window
         dialog = tk.Toplevel(self.root)
         dialog.overrideredirect(True)
         dialog.title("Confirm Deletion")
-        dialog.geometry("380x220")
         dialog.resizable(False, False)
-        dialog.configure(bg="#FFFFFF")
+        dialog.configure(bg="#FFFFFF", highlightthickness=1, highlightbackground="#D1D5DB")
         dialog.transient(self.root)
         dialog.grab_set()
+        self._center_dialog(dialog, 380, 220)
 
-        # Center the popup window on the screen
-        dialog.update_idletasks()
-        x = self.root.winfo_x() + (self.root.winfo_width() // 2) - 190
-        y = self.root.winfo_y() + (self.root.winfo_height() // 2) - 110
-        dialog.geometry(f"+{x}+{y}")
-
-        # Warning text label
         tk.Label(
-            dialog, 
-            text="Are you sure you want to delete this record?", 
-            bg="#FFFFFF", 
-            fg="#111827", 
-            font=("Geist Mono", 9, "bold")
+            dialog,
+            text="Are you sure you want to delete this record?",
+            bg="#FFFFFF",
+            fg="#111827",
+            font=("Geist Mono", 9, "bold"),
         ).pack(pady=(20, 10))
 
-        # 5. Display the details of the app being deleted inside a styled box
         details_frame = tk.Frame(dialog, bg="#F9FAFB", padx=10, pady=10, relief="solid", bd=1)
         details_frame.pack(fill=tk.X, padx=20, pady=5)
 
         labels = [("App", target_app[0]), ("Category", target_app[1]), ("Owner", target_app[2]), ("URL", target_app[3])]
         for label_text, val in labels:
             tk.Label(
-                details_frame, 
-                text=f"{label_text}: {val}", 
-                bg="#F9FAFB", 
-                fg="#111827", 
-                font=("Geist Mono", 8), 
-                anchor="w"
+                details_frame,
+                text=f"{label_text}: {val}",
+                bg="#F9FAFB",
+                fg="#111827",
+                font=("Geist Mono", 8),
+                anchor="w",
             ).pack(fill=tk.X)
 
-        # 6. Action buttons frame (Delete vs Cancel)
         btn_frame = tk.Frame(dialog, bg="#FFFFFF")
         btn_frame.pack(pady=15)
 
         def confirm_delete():
-            # Remove item from list, save back to CSV, refresh table, and lock buttons
             apps.pop(app_index)
             data_manager.save_all_applications(apps)
             self.refresh_table()
             self.delete_button.config(state=tk.DISABLED, cursor="")
             self.edit_button.config(state=tk.DISABLED, cursor="")
-            dialog.destroy()
+            self._close_dialog(dialog)
             self.show_custom_message("Success", "Application record deleted successfully.")
 
         tk.Button(
-            btn_frame, text="Delete", bg="#EF4444", fg="#111827", font=("Geist Mono", 9), 
+            btn_frame, text="Delete", bg="#EF4444", fg="#111827", font=("Geist Mono", 9),
             command=confirm_delete, padx=15, pady=4, relief="flat", cursor="hand2"
         ).pack(side=tk.LEFT, padx=5)
-        
+
         tk.Button(
-            btn_frame, text="Cancel", bg="#E5E7EB", fg="#111827", font=("Geist Mono", 9), 
-            command=dialog.destroy, padx=15, pady=4, relief="flat", cursor="hand2"
+            btn_frame, text="Cancel", bg="#E5E7EB", fg="#111827", font=("Geist Mono", 9),
+            command=lambda: self._close_dialog(dialog), padx=15, pady=4, relief="flat", cursor="hand2"
         ).pack(side=tk.LEFT, padx=5)
 
         self.root.wait_window(dialog)
@@ -488,51 +460,53 @@ class ApplicationDirectory:
             entry.insert(0, val)
             entry.config(fg="#111827")  # Switch text color from placeholder gray to active dark text
 
+    def _center_dialog(self, dialog, width, height):
+        dialog.update_idletasks()
+        x = self.root.winfo_x() + (self.root.winfo_width() // 2) - (width // 2)
+        y = self.root.winfo_y() + (self.root.winfo_height() // 2) - (height // 2)
+        dialog.geometry(f"{width}x{height}+{x}+{y}")
+
+    def _close_dialog(self, dialog):
+        if dialog.winfo_exists():
+            try:
+                dialog.grab_release()
+            except tk.TclError:
+                pass
+            dialog.destroy()
+
     def ask_custom_confirm(self, title, message):
         """A compact custom Yes/No popup window."""
         confirmed = [False]
 
         dialog = tk.Toplevel(self.root)
+        dialog.overrideredirect(True)
         dialog.title(title)
-        dialog.geometry("380x210")
         dialog.resizable(False, False)
-        dialog.configure(bg="#FFFFFF")
+        dialog.configure(bg="#FFFFFF", highlightthickness=1, highlightbackground="#D1D5DB")
         dialog.transient(self.root)
-       
-
-        dialog.update_idletasks()
-        x = self.root.winfo_x() + (self.root.winfo_width() // 2) - (340 // 2)
-        y = self.root.winfo_y() + (self.root.winfo_height() // 2) - (170 // 2)
-        dialog.geometry(f"+{x}+{y}")
+        dialog.grab_set()
+        self._center_dialog(dialog, 380, 210)
 
         tk.Label(
             dialog, text=message, bg="#FFFFFF", fg="#111827",
-            font=("Geist Mono", 9), wraplength=300
+            font=("Geist Mono", 9), wraplength=320
         ).pack(pady=(25, 15), expand=False)
 
         btn_frame = tk.Frame(dialog, bg="#FFFFFF")
         btn_frame.pack(pady=(0, 15), expand=False)
 
-        def close_dialog():
-            if dialog.winfo_exists():
-                try:
-                    dialog.grab_release()
-                except tk.TclError:
-                    pass
-                dialog.destroy()
-
         def set_choice(value):
             confirmed[0] = value
-            close_dialog()
+            self._close_dialog(dialog)
 
         tk.Button(
             btn_frame, text="No", bg="#E5E7EB", fg="#111827", font=("Geist Mono", 9),
             command=lambda: set_choice(False), padx=18, pady=5
         ).pack(side=tk.LEFT, padx=6)
 
-        ttk.Button(
-            btn_frame, text="Yes", style="Black.TButton",
-            command=lambda: set_choice(True)
+        tk.Button(
+            btn_frame, text="Yes", bg="#E5E7EB", fg="#111827", font=("Geist Mono", 9),
+            command=lambda: set_choice(True), padx=18, pady=5, relief="flat"
         ).pack(side=tk.LEFT, padx=6)
 
         self.root.wait_window(dialog)
@@ -540,12 +514,12 @@ class ApplicationDirectory:
     
 
     def _normalize_text(self, value):
-            return " ".join(value.strip().lower().split())
+        return " ".join(value.strip().lower().split())
 
     def _normalize_url(self, url):
         return url.strip().lower().rstrip("/")
 
-    def _find_duplicate_issue(self, app_name, category, owner, url, apps, skip_index=None):
+    def _find_duplicate_issue(self, app_name, category, url, apps, skip_index=None):
         """Returns (match_type, message) if an exact or close match exists, else (None, None)."""
         norm_name = self._normalize_text(app_name)
         norm_url = self._normalize_url(url)
@@ -584,33 +558,33 @@ class ApplicationDirectory:
                 )
 
             # 3. Near-duplicate / typo check using difflib
-            name_ratio = difflib.SequenceMatcher(None, norm_name, existing_name).ratio()
-            cat_ratio = difflib.SequenceMatcher(None, norm_category, existing_cat).ratio()
-
-            if 0.85 <= name_ratio < 1.0:
-                return (
-                    "similar",
-                    f"Found a very similar existing App Name ({int(name_ratio * 100)}% match):\n"
-                    f"• Existing: {row[0]} ({row[1]})\n"
-                    f"• New Entry: {app_name} ({category})\n\n"
-                    f"Save anyway?"
-                )
-            if norm_category and norm_category == existing_cat:
-                return (
-                    "similar",
-                    f"Category '{row[1]}' already exists in the directory.\n"
-                    f"Save under '{category}' anyway?",
-                )
-            
-
-            if norm_category and existing_cat and 0.80 <= cat_ratio < 1.0:
-                return (
-                    "similar",
-                    f"Possible category typo/variation ({int(cat_ratio * 100)}% match):\n"
-                    f"• Existing Category: {row[1]}\n"
-                    f"• Entered Category: {category}\n\n"
-                    f"Save anyway?"
-                )
+            if norm_name and existing_name:
+                name_ratio = difflib.SequenceMatcher(None, norm_name, existing_name).ratio()
+                if 0.85 <= name_ratio < 1.0:
+                    return (
+                        "similar",
+                        f"Found a very similar existing App Name ({int(name_ratio * 100)}% match):\n"
+                        f"• Existing: {row[0]} ({row[1]})\n"
+                        f"• New Entry: {app_name} ({category})\n\n"
+                        f"Save anyway?",
+                    )
+                
+            if norm_category and existing_cat:
+                if norm_category == existing_cat:
+                    return (
+                        "similar",
+                        f"Category '{row[1]}' already exists in the directory.\n"
+                        f"Save under '{category}' anyway?",
+                    )
+                cat_ratio = difflib.SequenceMatcher(None, norm_category, existing_cat).ratio()
+                if 0.80 <= cat_ratio < 1.0:
+                    return (
+                        "similar",
+                        f"Possible category typo/variation ({int(cat_ratio * 100)}% match):\n"
+                        f"• Existing Category: {row[1]}\n"
+                        f"• Entered Category: {category}\n\n"
+                        f"Save anyway?",
+                    )
 
         return None, None
 
@@ -633,7 +607,7 @@ class ApplicationDirectory:
         editing_index = getattr(self, "selected_item_id", None)
 
         match_type, match_msg = self._find_duplicate_issue(
-            app_name, category, owner, url, apps, skip_index=editing_index
+            app_name, category, url, apps, skip_index=editing_index
         )
 
         if match_type == "exact":
@@ -655,6 +629,7 @@ class ApplicationDirectory:
         data_manager.save_all_applications(apps)
         self.refresh_table()
         self.clear_form()
+        self.root.update_idletasks()
 
         self.root.after(
             50,
@@ -667,17 +642,17 @@ class ApplicationDirectory:
             (self.app_name_entry, "Enter app name..."),
             (self.category_entry, "Select category..."),
             (self.owner_entry, "Enter owner name..."),
-            (self.url_entry, "https://...")
+            (self.url_entry, "https://..."),
         ]
-        
+
         for entry, placeholder in fields_data:
             entry.delete(0, tk.END)
             entry.insert(0, placeholder)
-            entry.icursor(0)
             entry.config(fg="#9CA3AF")
-            
+
         self.selected_item_id = None
         self.save_button.config(text="Save")
+        self.root.focus_set()
         
     def sort_table(self, column_index):
         """Sorts by the clicked column. Clicking the same column again reverses the order."""
