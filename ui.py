@@ -5,6 +5,7 @@ import data_manager
 import validation
 
 class ApplicationDirectory:
+    # Initialize main window, load records, build UI
     def __init__(self, root):
         self.root = root
 
@@ -36,6 +37,7 @@ class ApplicationDirectory:
         self.root.bind("<Return>", self._on_return_key)
         self.root.bind("<KP_Enter>", self._on_return_key)
 
+    # Pressing Enter key saves the entry/update
     def _on_return_key(self, event):
         widget = event.widget
         if widget is self.search_entry:
@@ -44,13 +46,14 @@ class ApplicationDirectory:
             return
         self.save_record()
         return "break"
-
-
+    
+    # Build top application header section
     def create_header(self):
         title_label = tk.Label(self.root, text="CITY OF MERIDIAN  -  INTERNAL IT APPLICATION DIRECTORY", 
         bg="#F0F3F8", fg="#111827", font=("Geist Mono", 13, "bold"))
         title_label.pack(fill=tk.X, anchor="center", padx=25, pady=(20, 15))
 
+    # Build search bar, Edit, and Delete buttons
     def create_toolbar(self):
         toolbar_frame = tk.Frame(self.root, bg="#F0F3F8")
         toolbar_frame.pack(fill=tk.X, padx=25, pady=(0, 15))
@@ -99,6 +102,7 @@ class ApplicationDirectory:
         )
         self.delete_button.pack(padx=1, pady=1)
 
+    # Enable/disable Edit/Delete selected button based on row selection
     def on_row_select(self, event):
         """Enables or disables edit/delete buttons based on whether a row is selected."""
         selected_items = self.tree.selection()
@@ -109,18 +113,20 @@ class ApplicationDirectory:
             self.edit_button.config(state=tk.DISABLED, cursor="")
             self.delete_button.config(state=tk.DISABLED, cursor="")
 
+    # Clear search placeholder on focus
     def on_search_focus_in(self, event):
         if self.search_entry.get() == "🔍 Search Directory...":
             self.search_entry.delete(0, tk.END)
             self.search_entry.config(fg="#111827")  # Dark text for typing
 
+    # Restore search placeholder when empty
     def on_search_focus_out(self, event):
         if not self.search_entry.get().strip():
             self.search_entry.delete(0, tk.END)
             self.search_entry.insert(0, "🔍 Search Directory...")
             self.search_entry.config(fg="#9CA3AF")  # Light gray placeholder color
 
-
+    # Build directory table view
     def create_table(self):
         # Outer wrapper frame to act as the solid black table border (#111827)
         table_outer_frame = tk.Frame(self.root, bg="#111827", bd=0)
@@ -200,12 +206,11 @@ class ApplicationDirectory:
         # --- BIND ROW SELECTION EVENT ---
         self.tree.bind("<<TreeviewSelect>>", self.on_row_select)
 
+    # Build form label with required asterisk
     def create_required_label(self, parent, text):
         #Helper to create a field label with a red asterisk.
         label_frame = tk.Frame(parent, bg="#F0F3F8")  # Matches form background
         
-    
-
         # Main label text
         tk.Label(
             label_frame, 
@@ -226,6 +231,7 @@ class ApplicationDirectory:
         
         return label_frame
 
+    # Build form entry field with placeholder
     def _create_field(self, parent, label_text, placeholder, row, col, padx_val=(0, 0)):
         """Helper to create the full form field container, label with red asterisk, and placeholder entry."""
         field_container = tk.Frame(parent, bg="#F0F3F8")
@@ -255,6 +261,7 @@ class ApplicationDirectory:
 
         return entry
 
+    # Build input form section
     def create_form(self):
         style = ttk.Style()
         style.theme_use("clam")
@@ -299,7 +306,8 @@ class ApplicationDirectory:
             relief="flat", bd=0, padx=16, pady=6, command=self.clear_form
         )
         self.clear_button.pack(padx=1, pady=1)
-    
+
+    # Reload CSV records and update count  
     def refresh_table(self):
         for row in self.tree.get_children():
             self.tree.delete(row)
@@ -317,6 +325,7 @@ class ApplicationDirectory:
         total_count = len(apps)
         self.status_label.config(text=f"Showing {total_count} entries of {total_count}")
 
+    # Show custom-styled alert popup
     def show_custom_message(self, title, message):
         """A compact, beginner-friendly custom popup window."""
         dialog = tk.Toplevel(self.root)
@@ -340,8 +349,7 @@ class ApplicationDirectory:
 
         self.root.wait_window(dialog)
 
-
-    #-------------------- Delete selected record and remove details from CSV file ---------------------
+    # Delete selected record from directory
     def delete_record(self):
         """Pre-populates a confirmation popup with selected record details and deletes it."""
         selected = self.tree.selection()
@@ -418,6 +426,7 @@ class ApplicationDirectory:
 
         self.root.wait_window(dialog)
 
+    # Load selected record into form
     def edit_record(self):
         """Loads the selected record's data into the form fields for editing."""
         # 1. Check if a row is selected
@@ -460,12 +469,14 @@ class ApplicationDirectory:
             entry.insert(0, val)
             entry.config(fg="#111827")  # Switch text color from placeholder gray to active dark text
 
+    # Center custom dialog over main window
     def _center_dialog(self, dialog, width, height):
         dialog.update_idletasks()
         x = self.root.winfo_x() + (self.root.winfo_width() // 2) - (width // 2)
         y = self.root.winfo_y() + (self.root.winfo_height() // 2) - (height // 2)
         dialog.geometry(f"{width}x{height}+{x}+{y}")
 
+    # Close custom dialog cleanly
     def _close_dialog(self, dialog):
         if dialog.winfo_exists():
             try:
@@ -474,6 +485,7 @@ class ApplicationDirectory:
                 pass
             dialog.destroy()
 
+    # Show custom confirmation popup
     def ask_custom_confirm(self, title, message):
         """A compact custom Yes/No popup window."""
         confirmed = [False]
@@ -512,13 +524,15 @@ class ApplicationDirectory:
         self.root.wait_window(dialog)
         return confirmed[0]
     
-
+    # Normalize text for comparison
     def _normalize_text(self, value):
         return " ".join(value.strip().lower().split())
 
+    # Normalize URL for comparison
     def _normalize_url(self, url):
         return url.strip().lower().rstrip("/")
 
+    # Check duplicates or typos with difflib
     def _find_duplicate_issue(self, app_name, category, url, apps, skip_index=None):
         """Returns (match_type, message) if an exact or close match exists, else (None, None)."""
         norm_name = self._normalize_text(app_name)
@@ -588,6 +602,7 @@ class ApplicationDirectory:
 
         return None, None
 
+    # Validate, check duplicates, save record
     def save_record(self):
         app_name = self.app_name_entry.get().strip()
         category = self.category_entry.get().strip()
@@ -636,6 +651,7 @@ class ApplicationDirectory:
             lambda: self.show_custom_message("Success", "Application record saved successfully."),
         )
 
+    # Reset form fields to default state
     def clear_form(self):
         """Resets all form fields back to their default placeholder states and resets selection state."""
         fields_data = [
@@ -653,7 +669,8 @@ class ApplicationDirectory:
         self.selected_item_id = None
         self.save_button.config(text="Save")
         self.root.focus_set()
-        
+
+    # Sort table rows by clicked column       
     def sort_table(self, column_index):
         """Sorts by the clicked column. Clicking the same column again reverses the order."""
         if self.sort_column == column_index:
@@ -664,7 +681,8 @@ class ApplicationDirectory:
 
         self.refresh_table()
         self.filter_table()
-    
+
+    # Filter displayed rows by search text
     def filter_table(self, *args):
         """Instantly filters rows, re-tags them for clean zebra striping, and updates the count."""
         if not hasattr(self, "tree") or not hasattr(self, "all_tree_items"):
