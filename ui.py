@@ -32,20 +32,6 @@ class ApplicationDirectory:
         self.sort_column = None    # which column is sorted (0-3)
         self.sort_reverse = False  # False = A to Z, True = Z to A
         self.refresh_table()
-
-        # Allow Enter to trigger save except on search or buttons
-        self.root.bind("<Return>", self._on_return_key)
-        self.root.bind("<KP_Enter>", self._on_return_key)
-
-    # Pressing Enter key saves the entry/update
-    def _on_return_key(self, event):
-        widget = event.widget
-        if widget is self.search_entry:
-            return
-        if isinstance(widget, (tk.Button, ttk.Button)):
-            return
-        self.save_record()
-        return "break"
     
     # Build top application header section
     def create_header(self):
